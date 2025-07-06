@@ -6,6 +6,7 @@ import { PatientData } from '@/types/patient';
 import PatientDemographics from './PatientDemographics';
 import SymptomsSection from './SymptomsSection';
 import AssessmentSection from './AssessmentSection';
+import { patientService } from '@/services/patientService';
 
 // Custom SVG component for the care symbol
 const CareSymbol = ({ className }: { className?: string }) => (
@@ -47,6 +48,9 @@ const PalliativeCareSheet = () => {
     trauma: ''
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
   const handleSymptomChange = (symptom: string, checked: boolean) => {
     setPatientData(prev => ({
       ...prev,
@@ -63,10 +67,43 @@ const PalliativeCareSheet = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Patient Data:', patientData);
-    // Handle form submission
+    
+    // Validate required fields
+    if (!patientData.name || !patientData.age || !patientData.contact || !patientData.gender) {
+      setSubmitMessage({ type: 'error', message: 'Please fill in all required fields (Name, Age, Contact, Gender)' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitMessage(null);
+
+    try {
+      const { data, error } = await patientService.createPatient(patientData);
+      
+      if (error) {
+        setSubmitMessage({ type: 'error', message: `Failed to save patient data: ${error}` });
+      } else {
+        setSubmitMessage({ type: 'success', message: 'Patient assessment saved successfully!' });
+        // Reset form after successful submission
+        setPatientData({
+          name: '',
+          age: '',
+          contact: '',
+          gender: '',
+          symptoms: [],
+          emotional: '',
+          financial: '',
+          spiritual: '',
+          trauma: ''
+        });
+      }
+    } catch (error) {
+      setSubmitMessage({ type: 'error', message: 'An unexpected error occurred while saving the patient data' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -142,13 +179,25 @@ const PalliativeCareSheet = () => {
             animationDelay="0.6s"
           />
 
+          {/* Submit Message */}
+          {submitMessage && (
+            <div className={`text-center p-4 rounded-lg ${
+              submitMessage.type === 'success' 
+                ? 'bg-green-100 text-green-800 border border-green-200' 
+                : 'bg-red-100 text-red-800 border border-red-200'
+            }`}>
+              {submitMessage.message}
+            </div>
+          )}
+
           {/* Submit Button */}
           <div className="flex justify-center pt-6 animate-fade-in-up" style={{ animationDelay: '0.7s' }}>
             <Button
               type="submit"
-              className="px-8 py-3 bg-gradient-to-r from-healing-500 to-care-500 hover:from-healing-600 hover:to-care-600 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              disabled={isSubmitting}
+              className="px-8 py-3 bg-gradient-to-r from-healing-500 to-care-500 hover:from-healing-600 hover:to-care-600 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
-              Save Patient Assessment
+              {isSubmitting ? 'Saving...' : 'Save Patient Assessment'}
             </Button>
           </div>
         </form>
