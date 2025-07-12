@@ -20,7 +20,7 @@ A comprehensive patient care documentation system built with React, TypeScript, 
 - **Frontend**: React, TypeScript, Tailwind CSS
 - **Backend**: Supabase (PostgreSQL database)
 - **Build Tool**: Vite
-- **Package Manager**: Bun
+- **Package Manager**: Npm
 - **UI Components**: shadcn/ui components
 
 ## Setup Instructions
@@ -41,7 +41,7 @@ cd case-sheet-report/caring-compass-sheet-main
 ### 2. Install Dependencies
 
 ```bash
-bun install
+npm install
 ```
 
 ### 3. Set Up Supabase
@@ -67,52 +67,106 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 3. Run the SQL script from `supabase-setup.sql`:
 
 ```sql
--- Create the patients table
-CREATE TABLE IF NOT EXISTS patients (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  age TEXT NOT NULL,
-  contact TEXT NOT NULL,
-  gender TEXT NOT NULL,
-  symptoms TEXT[] DEFAULT '{}',
-  emotional TEXT DEFAULT '',
-  financial TEXT DEFAULT '',
-  spiritual TEXT DEFAULT '',
-  trauma TEXT DEFAULT '',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+-- Create tables for Lakshmi Pain and Palliative Care
+
+-- Doctors table
+CREATE TABLE doctors (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    full_name VARCHAR(255) NOT NULL,
+    age INTEGER,
+    contact VARCHAR(20),
+    specialization VARCHAR(100),
+    gender VARCHAR(10),
+    emergency_contact VARCHAR(20),
+    qualifications VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- Create an index on created_at for better query performance
-CREATE INDEX IF NOT EXISTS patients_created_at_idx ON patients(created_at DESC);
+-- Patients table
+CREATE TABLE patients (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    age INTEGER NOT NULL,
+    contact VARCHAR(20) NOT NULL,
+    gender VARCHAR(10) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
 
--- Enable Row Level Security (RLS)
-ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
+-- Patient assessments table
+CREATE TABLE patient_assessments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+    doctor_id UUID REFERENCES doctors(id) ON DELETE SET NULL,
+    symptoms TEXT[], -- Array of symptoms
+    emotional_assessment TEXT,
+    financial_assessment TEXT,
+    spiritual_assessment TEXT,
+    medical_history TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
 
--- Create a policy that allows all operations for now
-CREATE POLICY "Allow all operations on patients" ON patients
-  FOR ALL USING (true);
+-- Create indexes for better performance
+CREATE INDEX idx_patients_name ON patients(name);
+CREATE INDEX idx_patients_contact ON patients(contact);
+CREATE INDEX idx_doctors_name ON doctors(full_name);
+CREATE INDEX idx_patient_assessments_patient_id ON patient_assessments(patient_id);
+CREATE INDEX idx_patient_assessments_doctor_id ON patient_assessments(doctor_id);
+CREATE INDEX idx_patient_assessments_created_at ON patient_assessments(created_at);
 
--- Create a function to automatically update the updated_at timestamp
+-- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = TIMEZONE('utc'::text, NOW());
-  RETURN NEW;
+    NEW.updated_at = TIMEZONE('utc'::text, NOW());
+    RETURN NEW;
 END;
 $$ language 'plpgsql';
 
--- Create a trigger to automatically update the updated_at column
-CREATE TRIGGER update_patients_updated_at
-  BEFORE UPDATE ON patients
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
-```
+-- Create triggers for updated_at
+CREATE TRIGGER update_doctors_updated_at BEFORE UPDATE ON doctors
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_patients_updated_at BEFORE UPDATE ON patients
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_patient_assessments_updated_at BEFORE UPDATE ON patient_assessments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE doctors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patient_assessments ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies (adjust based on your authentication needs)
+-- For now, allowing all operations for authenticated users
+CREATE POLICY "Enable all operations for authenticated users" ON doctors
+    FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON patients
+    FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Enable all operations for authenticated users" ON patient_assessments
+    FOR ALL USING (auth.role() = 'authenticated');
+
+-- If you want to allow anonymous access (not recommended for production)
+-- Uncomment the following policies and comment out the ones above
+/*
+CREATE POLICY "Enable all operations for anonymous users" ON doctors
+    FOR ALL USING (true);
+
+CREATE POLICY "Enable all operations for anonymous users" ON patients
+    FOR ALL USING (true);
+
+CREATE POLICY "Enable all operations for anonymous users" ON patient_assessments
+    FOR ALL USING (true);
+*/
 ### 6. Start the Development Server
 
 ```bash
-bun run dev
+npm run dev
 ```
 
 The application will be available at `http://localhost:5173`
@@ -177,19 +231,19 @@ The patient service provides the following operations:
 ### Running Tests
 
 ```bash
-bun test
+npm test
 ```
 
 ### Building for Production
 
 ```bash
-bun run build
+npm run build
 ```
 
 ### Linting
 
 ```bash
-bun run lint
+npm run lint
 ```
 
 ## Contributing
